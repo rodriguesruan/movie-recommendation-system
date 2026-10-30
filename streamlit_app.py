@@ -1,20 +1,31 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import streamlit as st
 
 from src.data.loaders import load_movie_lens_data
-from src.validation.recommendation_service import generate_recommendations_for_user
+from src.data.loaders import ensure_movie_lens_data
+from src.validation.recommendation_service import (
+    generate_recommendations_for_user,
+    train_recommendation_model,
+)
 
 
 st.set_page_config(page_title='Movie Recommendations', page_icon='🎬', layout='wide')
 st.title('Movie Recommendation Dashboard')
 
+
+@st.cache_resource(show_spinner='Loading MovieLens data and training the recommendation model...')
+def load_recommendation_resources():
+    data_dir = ensure_movie_lens_data('data/raw/ml-1m')
+    ratings, movies, users = load_movie_lens_data(data_dir)
+    model = train_recommendation_model(ratings)
+    return ratings, movies, users, model
+
+
 try:
-    ratings_df, movies_df, users_df = load_movie_lens_data(Path('data/raw/ml-1m'))
-except FileNotFoundError:
-    st.warning('MovieLens data was not found. Download the dataset under data/raw/ml-1m before running the app.')
+    ratings_df, movies_df, users_df, recommendation_model = load_recommendation_resources()
+except (FileNotFoundError, OSError, ValueError) as error:
+    st.error(f'Could not initialize recommendations: {error}')
     st.stop()
 
 user_ids = sorted(users_df['userId'].unique().tolist())
@@ -26,6 +37,7 @@ recommendations = generate_recommendations_for_user(
     movies_df,
     user_id=int(selected_user),
     top_n=top_n,
+    model=recommendation_model,
 )
 
 if not recommendations:

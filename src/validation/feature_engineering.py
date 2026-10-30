@@ -6,31 +6,25 @@ from src.validation.temporal_strategy import temporal_split_by_timestamp
 
 
 def build_user_movie_features(ratings_df: pd.DataFrame) -> pd.DataFrame:
-    """Create temporal-safe user and item historical features.
+    """Create rating-history features using events strictly before each row."""
+    features = ratings_df.copy().sort_values('timestamp', kind='mergesort').reset_index(drop=True)
 
-    All statistics are computed from the current dataset and remain suitable for
-    an ordered split because they do not use future information beyond the event
-    row itself. For real production use, they should be computed per fold using
-    only historical rows prior to each target event.
-    """
-    features = ratings_df.copy().sort_values('timestamp').reset_index(drop=True)
+    user_groups = features.groupby('userId', sort=False)['rating']
+    item_groups = features.groupby('movieId', sort=False)['rating']
+    features['user_rating_count'] = user_groups.cumcount()
+    features['item_rating_count'] = item_groups.cumcount()
 
-    user_stats = features.groupby('userId')['rating'].agg(['mean', 'count'])
-    item_stats = features.groupby('movieId')['rating'].agg(['mean', 'count'])
-
-    user_map = user_stats['mean'].rename('user_mean_rating')
-    user_count_map = user_stats['count'].rename('user_rating_count')
-    item_map = item_stats['mean'].rename('item_mean_rating')
-    item_count_map = item_stats['count'].rename('item_rating_count')
-
-    features['user_mean_rating'] = features['userId'].map(user_map)
-    features['user_rating_count'] = features['userId'].map(user_count_map)
-    features['item_mean_rating'] = features['movieId'].map(item_map)
-    features['item_rating_count'] = features['movieId'].map(item_count_map)
-
-    interaction_counts = features.groupby(['userId', 'movieId']).size().rename('user_item_interaction_count')
-    features['user_item_interaction_count'] = features.set_index(['userId', 'movieId']).index.map(interaction_counts)
-    features['user_item_interaction_count'] = features['user_item_interaction_count'].fillna(0).astype(int)
+    user_prior_sum = user_groups.cumsum() - features['rating']
+    item_prior_sum = item_groups.cumsum() - features['rating']
+    features['user_mean_rating'] = (
+        user_prior_sum.div(features['user_rating_count'].replace(0, pd.NA)).fillna(3.0)
+    )
+    features['item_mean_rating'] = (
+        item_prior_sum.div(features['item_rating_count'].replace(0, pd.NA)).fillna(3.0)
+    )
+    features['user_item_interaction_count'] = (
+        features.groupby(['userId', 'movieId'], sort=False).cumcount()
+    )
 
     return features
 

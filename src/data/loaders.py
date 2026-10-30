@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+import shutil
+import tempfile
+import urllib.request
+import zipfile
 from pathlib import Path
 from typing import Tuple
 
 import pandas as pd
+
+
+MOVIELENS_URL = 'https://files.grouplens.org/datasets/movielens/ml-1m.zip'
+MOVIELENS_FILES = ('ratings.dat', 'movies.dat', 'users.dat')
 
 
 def resolve_movie_lens_dir(base_dir: str | Path) -> Path:
@@ -20,6 +28,39 @@ def resolve_movie_lens_dir(base_dir: str | Path) -> Path:
     raise FileNotFoundError(
         f"MovieLens raw data not found in '{base_path}'. Expected ratings.dat, movies.dat and users.dat."
     )
+
+
+def ensure_movie_lens_data(base_dir: str | Path) -> Path:
+    """Return the MovieLens directory, downloading required files if missing."""
+    base_path = Path(base_dir)
+    target_dir = base_path if base_path.name == 'ml-1m' else base_path / 'ml-1m'
+    try:
+        return resolve_movie_lens_dir(base_path)
+    except FileNotFoundError:
+        pass
+
+    target_dir.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        temporary_path = Path(temporary_directory)
+        archive_path = temporary_path / 'ml-1m.zip'
+        try:
+            urllib.request.urlretrieve(MOVIELENS_URL, archive_path)
+            with zipfile.ZipFile(archive_path) as archive:
+                for filename in MOVIELENS_FILES:
+                    member_name = f'ml-1m/{filename}'
+                    with archive.open(member_name) as source:
+                        with (temporary_path / filename).open('wb') as destination:
+                            shutil.copyfileobj(source, destination)
+        except (OSError, zipfile.BadZipFile, KeyError) as error:
+            raise FileNotFoundError(
+                f'Could not download a valid MovieLens dataset from {MOVIELENS_URL}.'
+            ) from error
+
+        target_dir.mkdir(parents=True, exist_ok=True)
+        for filename in MOVIELENS_FILES:
+            shutil.copy2(temporary_path / filename, target_dir / filename)
+
+    return resolve_movie_lens_dir(target_dir)
 
 
 def load_movie_lens_data(base_dir: str | Path) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:

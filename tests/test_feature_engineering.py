@@ -29,6 +29,25 @@ def test_user_movie_feature_builder_creates_approved_columns():
     assert features['item_mean_rating'].notna().all()
 
 
+def test_user_movie_features_use_only_ratings_before_each_event():
+    ratings = pd.DataFrame(
+        {
+            'userId': [1, 1, 1],
+            'movieId': [10, 10, 11],
+            'rating': [4.0, 2.0, 5.0],
+            'timestamp': [100, 200, 300],
+        }
+    )
+
+    features = build_user_movie_features(ratings)
+
+    assert features.loc[0, 'user_mean_rating'] == 3.0
+    assert features.loc[0, 'user_rating_count'] == 0
+    assert features.loc[1, 'user_mean_rating'] == 4.0
+    assert features.loc[1, 'item_mean_rating'] == 4.0
+    assert features.loc[1, 'user_item_interaction_count'] == 1
+
+
 def test_temporal_split_features_are_safe_for_future_validation():
     ratings = pd.DataFrame(
         {

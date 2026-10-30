@@ -1,13 +1,14 @@
 # Movie Recommendation System
 
-This project is a local movie recommendation system built on the MovieLens 1M dataset. It includes data validation and EDA, temporal model evaluation, recommendation generation, a FastAPI endpoint, and a Streamlit dashboard.
+This project is a movie recommendation system built on MovieLens 1M. It includes data validation and EDA, leakage-safe temporal features, a trained Random Forest ranking model, a FastAPI endpoint, and a Streamlit dashboard.
 
 ## Objective
 
 - Load and validate the official MovieLens 1M dataset.
 - Understand user behavior, review counts, rating distributions and sparsity.
-- Confirm data quality before any modeling work.
-- Prepare a reproducible project structure for later phases of feature engineering, temporal validation and recommendation models.
+- Train and evaluate recommendation models using chronologically ordered data.
+- Rank unseen movies with Random Forest predictions and provide explanations based on observed rating history.
+- Serve recommendations through FastAPI and Streamlit.
 
 ## Dataset
 
@@ -51,7 +52,7 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-## Downloading the dataset
+## Dataset setup
 
 ```bash
 python - <<'PY'
@@ -66,7 +67,7 @@ print('Downloaded to', out)
 PY
 ```
 
-Then unzip the archive into `data/raw`.
+Then unzip the archive into `data/raw`. The API and Streamlit app also download the official archive automatically when the required files are missing. The download stays local or in the host's temporary filesystem and is never committed.
 
 ## Notebook execution
 
@@ -92,7 +93,7 @@ uvicorn src.api:app --reload
 - Recommendations: `http://127.0.0.1:8000/recommendations/1?top_n=10`
 - Interactive API docs: `http://127.0.0.1:8000/docs`
 
-The API reads MovieLens files from `data/raw/ml-1m` and returns HTTP 503 when the local dataset is missing. It returns HTTP 404 for an unknown user, and `top_n` must be between 1 and 50.
+The API reads MovieLens files from `data/raw/ml-1m`, downloading the official dataset if needed. It returns HTTP 404 for an unknown user, and `top_n` must be between 1 and 50. The serving model is trained once per API process using prior-only rating-history features and a deterministic sample of up to 100,000 rows.
 
 ## Run the dashboard
 
@@ -100,13 +101,25 @@ The API reads MovieLens files from `data/raw/ml-1m` and returns HTTP 503 when th
 streamlit run streamlit_app.py
 ```
 
+The dashboard downloads MovieLens if needed, trains the same serving model once, and caches the data/model for the session.
+
+## Deploy the dashboard
+
+The repository includes a Render Blueprint in `render.yaml`.
+
+1. Sign in to Render and connect the GitHub repository `rodriguesruan/movie-recommendation-system`.
+2. Create a new Blueprint from the repository and approve the `movie-recommendation-system` web service.
+3. Wait for the build and open the generated `onrender.com` URL.
+
+The free service may sleep when idle and cold-start by downloading MovieLens and training the model again. The FastAPI service remains available for local use with the command above; a separate hosted API service is not configured.
+
 ## Current status
 
-Phases 1-9 are implemented locally. The current ranking uses user and item rating history; the project does not claim that the Streamlit dashboard is deployed publicly.
+The recommendation dashboard, FastAPI service, and GitHub Actions tests are implemented. The dashboard is prepared for Render deployment, but it is not publicly hosted until the Blueprint is authorized in a Render account.
 
 ## Important notes
 
 - No Docker is used.
 - No paid APIs are required.
 - Raw data is kept local to avoid committing datasets to GitHub.
-- No metrics or model results are invented in this phase.
+- Model quality should be judged from the temporal evaluation reports, not from the illustrative UI alone.
