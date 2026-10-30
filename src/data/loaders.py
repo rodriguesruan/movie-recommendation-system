@@ -63,6 +63,31 @@ def ensure_movie_lens_data(base_dir: str | Path) -> Path:
     return resolve_movie_lens_dir(target_dir)
 
 
+def _read_movielens_table(
+    file_path: Path,
+    names: list[str],
+    dtype: dict[str, str],
+) -> pd.DataFrame:
+    """Normalize MovieLens's ``::`` delimiter and parse it with pandas' C engine."""
+    with tempfile.NamedTemporaryFile(suffix='.tsv', delete=False) as converted_file:
+        converted_path = Path(converted_file.name)
+        with file_path.open('rb') as source:
+            for line in source:
+                converted_file.write(line.replace(b'::', b'\t'))
+
+    try:
+        return pd.read_csv(
+            converted_path,
+            sep='\t',
+            engine='c',
+            encoding='latin-1',
+            names=names,
+            dtype=dtype,
+        )
+    finally:
+        converted_path.unlink(missing_ok=True)
+
+
 def load_movie_lens_data(base_dir: str | Path) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Load the MovieLens 1M ratings, movies and users tables.
 
@@ -71,31 +96,28 @@ def load_movie_lens_data(base_dir: str | Path) -> Tuple[pd.DataFrame, pd.DataFra
     """
     data_dir = resolve_movie_lens_dir(base_dir)
 
-    ratings_df = pd.read_csv(
-        data_dir / "ratings.dat",
-        sep="::",
-        engine="python",
-        encoding="latin-1",
-        names=["userId", "movieId", "rating", "timestamp"],
-        dtype={"userId": "int64", "movieId": "int64", "rating": "float64", "timestamp": "int64"},
+    ratings_df = _read_movielens_table(
+        data_dir / 'ratings.dat',
+        names=['userId', 'movieId', 'rating', 'timestamp'],
+        dtype={'userId': 'int64', 'movieId': 'int64', 'rating': 'float64', 'timestamp': 'int64'},
     )
 
-    movies_df = pd.read_csv(
-        data_dir / "movies.dat",
-        sep="::",
-        engine="python",
-        encoding="latin-1",
-        names=["movieId", "title", "genres"],
-        dtype={"movieId": "int64", "title": "string", "genres": "string"},
+    movies_df = _read_movielens_table(
+        data_dir / 'movies.dat',
+        names=['movieId', 'title', 'genres'],
+        dtype={'movieId': 'int64', 'title': 'string', 'genres': 'string'},
     )
 
-    users_df = pd.read_csv(
-        data_dir / "users.dat",
-        sep="::",
-        engine="python",
-        encoding="latin-1",
-        names=["userId", "gender", "age", "occupation", "zip_code"],
-        dtype={"userId": "int64", "gender": "string", "age": "int64", "occupation": "int64", "zip_code": "string"},
+    users_df = _read_movielens_table(
+        data_dir / 'users.dat',
+        names=['userId', 'gender', 'age', 'occupation', 'zip_code'],
+        dtype={
+            'userId': 'int64',
+            'gender': 'string',
+            'age': 'int64',
+            'occupation': 'int64',
+            'zip_code': 'string',
+        },
     )
 
     return ratings_df, movies_df, users_df

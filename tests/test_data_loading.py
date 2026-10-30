@@ -51,3 +51,26 @@ def test_ensure_movie_lens_data_downloads_only_required_files(monkeypatch):
 
         assert data_dir == temporary_path / 'data' / 'raw' / 'ml-1m'
         assert {path.name for path in data_dir.iterdir()} == set(loaders.MOVIELENS_FILES)
+
+
+def test_load_movie_lens_data_parses_all_three_tables():
+    project_dir = Path(__file__).resolve().parents[1]
+    with tempfile.TemporaryDirectory(dir=project_dir) as temporary_directory:
+        data_dir = Path(temporary_directory) / 'ml-1m'
+        data_dir.mkdir()
+        (data_dir / 'ratings.dat').write_text(
+            '1::10::4::100\n2::10::3::200\n', encoding='latin-1'
+        )
+        (data_dir / 'movies.dat').write_text(
+            '10::Example Movie (2000)::Drama|Comedy\n', encoding='latin-1'
+        )
+        (data_dir / 'users.dat').write_text(
+            '1::M::25::1::12345\n2::F::35::2::54321\n', encoding='latin-1'
+        )
+
+        ratings, movies, users = load_movie_lens_data(data_dir)
+
+        assert ratings['rating'].tolist() == [4.0, 3.0]
+        assert movies.loc[0, 'title'] == 'Example Movie (2000)'
+        assert movies.loc[0, 'genres'] == 'Drama|Comedy'
+        assert users['zip_code'].tolist() == ['12345', '54321']
