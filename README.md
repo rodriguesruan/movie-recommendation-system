@@ -1,6 +1,6 @@
 # Movie Recommendation System
 
-This project is a portfolio-ready movie recommendation system built on the MovieLens 1M dataset. The initial phase focuses on environment setup, raw data validation and an exploratory data analysis (EDA) to establish a solid, production-oriented foundation before model development.
+This project is a local movie recommendation system built on the MovieLens 1M dataset. It includes data validation and EDA, temporal model evaluation, recommendation generation, a FastAPI endpoint, and a Streamlit dashboard.
 
 ## Objective
 
@@ -80,9 +80,29 @@ jupyter notebook notebooks/01_data_understanding.ipynb
 python -m pytest -q
 ```
 
+## Run the API
+
+Install the requirements, then start the HTTP API from the project root:
+
+```bash
+uvicorn src.api:app --reload
+```
+
+- Health check: `http://127.0.0.1:8000/health`
+- Recommendations: `http://127.0.0.1:8000/recommendations/1?top_n=10`
+- Interactive API docs: `http://127.0.0.1:8000/docs`
+
+The API reads MovieLens files from `data/raw/ml-1m` and returns HTTP 503 when the local dataset is missing. It returns HTTP 404 for an unknown user, and `top_n` must be between 1 and 50.
+
+## Run the dashboard
+
+```bash
+streamlit run streamlit_app.py
+```
+
 ## Current status
 
-This repository is in the first development phase only. The project validates the raw dataset and produces an initial exploratory analysis without training any recommendation model.
+Phases 1-9 are implemented locally. The current ranking uses user and item rating history; the project does not claim that the Streamlit dashboard is deployed publicly.
 
 ## Important notes
 
