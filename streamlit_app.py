@@ -55,5 +55,5 @@ else:
             }
             for item in recommendations
         ],
-        use_container_width=True,
+        width='stretch',
     )
