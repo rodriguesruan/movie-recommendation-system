@@ -1,5 +1,6 @@
 import pandas as pd
 
+import src.validation.recommendation_service as recommendation_service
 from src.validation.recommendation_service import generate_recommendations_for_user
 
 
@@ -72,3 +73,31 @@ def test_recommendations_are_ranked_by_model_prediction():
     assert results[0]['movieId'] == 12
     assert results[0]['prediction'] == 5.0
     assert 'historical average' in results[0]['explanation']
+
+
+def test_training_samples_before_building_features(monkeypatch):
+    ratings = pd.DataFrame(
+        {
+            'userId': [1, 1, 2, 2, 3, 3],
+            'movieId': [10, 11, 12, 13, 14, 15],
+            'rating': [4.0, 5.0, 3.0, 2.0, 4.5, 3.5],
+            'timestamp': [100, 200, 300, 400, 500, 600],
+        }
+    )
+    original_builder = recommendation_service.build_user_movie_features
+    rows_seen_by_feature_builder = []
+
+    def track_feature_input(sampled_ratings):
+        rows_seen_by_feature_builder.append(len(sampled_ratings))
+        return original_builder(sampled_ratings)
+
+    monkeypatch.setattr(
+        recommendation_service,
+        'build_user_movie_features',
+        track_feature_input,
+    )
+
+    model = recommendation_service.train_recommendation_model(ratings, max_training_rows=4)
+
+    assert rows_seen_by_feature_builder == [4]
+    assert len(model.estimators_) == 40

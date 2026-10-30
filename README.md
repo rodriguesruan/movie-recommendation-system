@@ -93,7 +93,7 @@ uvicorn src.api:app --reload
 - Recommendations: `http://127.0.0.1:8000/recommendations/1?top_n=10`
 - Interactive API docs: `http://127.0.0.1:8000/docs`
 
-The API reads MovieLens files from `data/raw/ml-1m`, downloading the official dataset if needed. It returns HTTP 404 for an unknown user, and `top_n` must be between 1 and 50. The serving model is trained once per API process using prior-only rating-history features and a deterministic sample of up to 100,000 rows.
+The API reads MovieLens files from `data/raw/ml-1m`, downloading the official dataset if needed. It returns HTTP 404 for an unknown user, and `top_n` must be between 1 and 50. The serving model is trained once per API process using prior-only rating-history features and a deterministic sample of up to 30,000 rows to keep startup resource use bounded.
 
 ## Run the dashboard
 
@@ -101,7 +101,7 @@ The API reads MovieLens files from `data/raw/ml-1m`, downloading the official da
 streamlit run streamlit_app.py
 ```
 
-The dashboard downloads MovieLens if needed, trains the same serving model once, and caches the data/model for the session.
+The dashboard downloads MovieLens if needed, trains the same bounded serving model once, and caches the data/model for the session.
 
 ## Deploy the dashboard
 

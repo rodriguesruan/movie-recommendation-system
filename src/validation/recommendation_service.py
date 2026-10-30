@@ -19,7 +19,7 @@ MODEL_FEATURES = [
     'user_item_interaction_count',
 ]
 DEFAULT_RATING = 3.0
-MAX_TRAINING_ROWS = 100_000
+MAX_TRAINING_ROWS = 30_000
 
 
 def train_recommendation_model(
@@ -32,16 +32,20 @@ def train_recommendation_model(
     if max_training_rows < 1:
         raise ValueError('max_training_rows must be at least 1.')
 
-    training = build_user_movie_features(ratings_df)
-    if len(training) > max_training_rows:
-        training = training.sample(n=max_training_rows, random_state=42).sort_values('timestamp')
+    training_ratings = ratings_df
+    if len(training_ratings) > max_training_rows:
+        training_ratings = training_ratings.sample(
+            n=max_training_rows,
+            random_state=42,
+        ).sort_values('timestamp')
+    training = build_user_movie_features(training_ratings)
 
     model = TimestampAwareRandomForestRegressor(
-        n_estimators=80,
-        max_depth=18,
-        min_samples_leaf=5,
+        n_estimators=40,
+        max_depth=14,
+        min_samples_leaf=10,
         random_state=42,
-        n_jobs=-1,
+        n_jobs=1,
     )
     model.fit(training[MODEL_FEATURES], training['rating'])
     return model
