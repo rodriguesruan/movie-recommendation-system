@@ -1,0 +1,25 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+.env.*
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db
+
+# Project data
+# keep raw dataset in local workspace but ignore from git
+/data/raw/
+/data/interim/
+/data/processed/
+/data/external/
+
+# Heavy/generated outputs
+artifacts/
+*.pkl
+*.joblib
+*.parquet
+
+# IDE and OS
+.vscode/
