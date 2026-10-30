@@ -26,6 +26,22 @@ def test_temporal_split_keeps_future_out_of_train():
     assert not leakage_audit(train_df, val_df)
 
 
+def test_temporal_split_keeps_equal_timestamps_in_the_same_partition():
+    df = pd.DataFrame(
+        {
+            'userId': [1, 2, 3, 4, 5, 6],
+            'movieId': [10, 11, 12, 13, 14, 15],
+            'rating': [4.0, 3.0, 5.0, 2.0, 4.5, 3.5],
+            'timestamp': [100, 200, 200, 200, 300, 400],
+        }
+    )
+
+    train_df, val_df = temporal_split_by_timestamp(df, validation_fraction=0.5)
+
+    assert train_df['timestamp'].max() < val_df['timestamp'].min()
+    assert len(train_df) + len(val_df) == len(df)
+
+
 def test_global_mean_baseline_is_calculated_without_leakage():
     train_df = pd.DataFrame(
         {'rating': [3.0, 4.0, 5.0, 2.0, 3.5]},

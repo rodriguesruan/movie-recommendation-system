@@ -21,7 +21,14 @@ def temporal_split_by_timestamp(
         raise ValueError('validation_fraction must be between 0 and 1.')
 
     sorted_df = ratings_df.sort_values('timestamp').reset_index(drop=True)
-    split_index = max(1, min(len(sorted_df) - 1, int(len(sorted_df) * (1 - validation_fraction))))
+    target_index = max(1, min(len(sorted_df) - 1, int(len(sorted_df) * (1 - validation_fraction))))
+    boundary_indices = np.flatnonzero(
+        sorted_df['timestamp'].to_numpy()[1:] != sorted_df['timestamp'].to_numpy()[:-1]
+    ) + 1
+    valid_boundaries = boundary_indices[(boundary_indices > 0) & (boundary_indices < len(sorted_df))]
+    if len(valid_boundaries) == 0:
+        raise ValueError('The dataset needs at least two distinct timestamps for a temporal split.')
+    split_index = int(valid_boundaries[np.argmin(np.abs(valid_boundaries - target_index))])
 
     train_df = sorted_df.iloc[:split_index].copy()
     val_df = sorted_df.iloc[split_index:].copy()

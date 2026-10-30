@@ -1,125 +1,126 @@
 # Movie Recommendation System
 
-This project is a movie recommendation system built on MovieLens 1M. It includes data validation and EDA, leakage-safe temporal features, a trained Random Forest ranking model, a FastAPI endpoint, and a Streamlit dashboard.
+An end-to-end movie recommendation project using MovieLens 1M. It covers data quality, leakage-aware temporal validation, model comparison, personalized Top-N recommendations, a live Streamlit app, and a FastAPI service.
 
-## Objective
+[![Tests](https://github.com/rodriguesruan/movie-recommendation-system/actions/workflows/tests.yml/badge.svg)](https://github.com/rodriguesruan/movie-recommendation-system/actions/workflows/tests.yml)
+[![Live demo](https://img.shields.io/badge/demo-live-2ea44f)](https://movie-recommendation-system-9pis.onrender.com)
 
-- Load and validate the official MovieLens 1M dataset.
-- Understand user behavior, review counts, rating distributions and sparsity.
-- Train and evaluate recommendation models using chronologically ordered data.
-- Rank unseen movies with Random Forest predictions and provide explanations based on observed rating history.
-- Serve recommendations through FastAPI and Streamlit.
+**Live demo:** [movie-recommendation-system-9pis.onrender.com](https://movie-recommendation-system-9pis.onrender.com)
 
-## Dataset
+**API docs (local):** [OpenAPI / Swagger](http://127.0.0.1:8000/docs) after starting FastAPI below.
 
-The project uses the official MovieLens 1M dataset from GroupLens.
+**Dataset:** [GroupLens MovieLens 1M](https://files.grouplens.org/datasets/movielens/ml-1m.zip)
 
-- Source: https://files.grouplens.org/datasets/movielens/ml-1m.zip
-- Files used: ratings.dat, movies.dat, users.dat
-- Raw data is stored locally in `data/raw/ml-1m` and is not committed to the repository.
+> The free Render service may sleep when idle. Its first request after inactivity can take longer while the app starts, downloads data if needed, and trains the serving model.
 
-## Project structure
+## Project Highlights
 
-```text
-movie-recommendation-system/
-├── .venv/
-├── data/
-│   └── raw/
-│       └── ml-1m/
-├── notebooks/
-├── reports/
-│   └── figures/
-├── src/
-│   ├── data/
-│   └── validation/
-├── tests/
-├── .env.example
-├── .gitignore
-├── README.md
-├── requirements.txt
-└── .venv/
+- 1,000,209 ratings across 6,040 users and 3,883 movie records.
+- Strict chronological train/validation split; equal timestamps are never divided across the boundary.
+- Historical user/item features exclude the rating being predicted and all later events.
+- Random Forest predictions rank unseen movies; explanations cite actual user and movie rating history.
+- FastAPI endpoints and an interactive Streamlit dashboard.
+- GitHub Actions runs the test suite on pushes and pull requests. Raw MovieLens files are downloaded in CI and are not stored in Git.
+
+## Evaluation Results
+
+Results below use a strict chronological holdout on the official MovieLens 1M ratings: 800,168 training events and 200,041 later validation events. The Random Forest is trained on a deterministic sample of up to 30,000 training rows to match the resource-bounded serving configuration.
+
+| Model | RMSE ↓ | MAE ↓ | R² ↑ |
+| --- | ---: | ---: | ---: |
+| Global mean baseline | 1.1043 | 0.9195 | -0.0016 |
+| Smoothed user/item bias | **0.9590** | **0.7585** | **0.2447** |
+| Serving Random Forest | 0.9766 | 0.7844 | 0.2165 |
+
+The current Random Forest does **not** beat the simpler user/item-bias baseline on this rating-prediction holdout. This is reported transparently; the serving recommender currently uses the Random Forest score, and Top-K ranking metrics such as Precision@K have not yet been evaluated. Full protocol and results: [reports/model_evaluation.md](reports/model_evaluation.md). Reproduce with `python -m src.validation.evaluate`.
+
+## Exploratory Analysis
+
+The data quality audit found no missing values or duplicate rows in the three MovieLens tables. Ratings range from 1 to 5; 3,706 of the 3,883 movie records have at least one rating.
+
+| Rating distribution | Most-rated movies |
+| --- | --- |
+| ![MovieLens rating distribution](reports/figures/ratings_distribution.png) | ![Most-rated movies](reports/figures/top_movies_by_reviews.png) |
+
+Additional plots are available in [reports/figures](reports/figures/).
+
+## How It Works
+
+1. Load and validate MovieLens ratings, movies, and users.
+2. Sort interactions by timestamp and construct user/item history from prior events only.
+3. Compare global mean, smoothed user/item bias, and Random Forest on a forward-in-time holdout.
+4. Score unseen movies for a selected user, rank the Top-N, and explain scores with observed history.
+5. Serve the dashboard on Render and expose the local API through FastAPI.
+
+The workflow is:
+
+```mermaid
+flowchart LR
+	A[MovieLens 1M] --> B[Validation and EDA]
+	B --> C[Temporal features]
+	C --> D[Model evaluation]
+	D --> E[Top-N recommendations]
+	E --> F[Streamlit dashboard]
+	E --> G[FastAPI]
 ```
 
-## Local setup
+## Run Locally
 
-```bash
+Requires Python 3.11 or newer.
+
+```powershell
+git clone https://github.com/rodriguesruan/movie-recommendation-system.git
+cd movie-recommendation-system
 python -m venv .venv
-. .venv/bin/activate   # Linux/macOS
-# or
-.venv\Scripts\activate  # Windows PowerShell
-
-python -m pip install --upgrade pip
+.\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 ```
 
-## Dataset setup
+The app downloads the official dataset to `data/raw/ml-1m` if it is missing. Raw data is ignored by Git.
 
-```bash
-python - <<'PY'
-from pathlib import Path
-import urllib.request
+Start the dashboard:
 
-url = 'https://files.grouplens.org/datasets/movielens/ml-1m.zip'
-out = Path('data/raw/ml-1m.zip')
-out.parent.mkdir(parents=True, exist_ok=True)
-urllib.request.urlretrieve(url, out)
-print('Downloaded to', out)
-PY
-```
-
-Then unzip the archive into `data/raw`. The API and Streamlit app also download the official archive automatically when the required files are missing. The download stays local or in the host's temporary filesystem and is never committed.
-
-## Notebook execution
-
-```bash
-jupyter notebook notebooks/01_data_understanding.ipynb
-```
-
-## Running tests
-
-```bash
-python -m pytest -q
-```
-
-## Run the API
-
-Install the requirements, then start the HTTP API from the project root:
-
-```bash
-uvicorn src.api:app --reload
-```
-
-- Health check: `http://127.0.0.1:8000/health`
-- Recommendations: `http://127.0.0.1:8000/recommendations/1?top_n=10`
-- Interactive API docs: `http://127.0.0.1:8000/docs`
-
-The API reads MovieLens files from `data/raw/ml-1m`, downloading the official dataset if needed. It returns HTTP 404 for an unknown user, and `top_n` must be between 1 and 50. The serving model is trained once per API process using prior-only rating-history features and a deterministic sample of up to 30,000 rows to keep startup resource use bounded.
-
-## Run the dashboard
-
-```bash
+```powershell
 streamlit run streamlit_app.py
 ```
 
-The dashboard downloads MovieLens if needed, trains the same bounded serving model once, and caches the data/model for the session.
+Start the API in a separate terminal:
 
-## Deploy the dashboard
+```powershell
+uvicorn src.api:app --reload
+```
 
-The repository includes a Render Blueprint in `render.yaml`.
+| Endpoint | Description |
+| --- | --- |
+| `GET /health` | API health check |
+| `GET /recommendations/{user_id}?top_n=10` | Recommendations for a known user; `top_n` range is 1–50 |
+| `/docs` | Interactive OpenAPI documentation |
 
-1. Sign in to Render and connect the GitHub repository `rodriguesruan/movie-recommendation-system`.
-2. Create a new Blueprint from the repository and approve the `movie-recommendation-system` web service.
-3. Wait for the build and open the generated `onrender.com` URL.
+Run all tests with `python -m pytest -q`. Reproduce the model comparison with `python -m src.validation.evaluate`.
 
-The free service may sleep when idle and cold-start by downloading MovieLens and training the model again. The FastAPI service remains available for local use with the command above; a separate hosted API service is not configured.
+## Tech Stack
 
-## Current status
+Python · pandas · NumPy · scikit-learn · FastAPI · Streamlit · pytest · GitHub Actions · Render
 
-The recommendation dashboard, FastAPI service, and GitHub Actions tests are implemented. The dashboard is prepared for Render deployment, but it is not publicly hosted until the Blueprint is authorized in a Render account.
+## Repository Layout
 
-## Important notes
+```text
+src/data/                 MovieLens loading and bootstrap
+src/validation/           Quality, temporal features, models, evaluation, recommendations
+tests/                    Unit and API tests
+reports/                  Data quality, model evaluation, and EDA figures
+notebooks/                Exploratory analysis notebook
+streamlit_app.py          Interactive dashboard
+render.yaml               Render deployment blueprint
+```
 
-- No Docker is used.
-- No paid APIs are required.
-- Raw data is kept local to avoid committing datasets to GitHub.
-- Model quality should be judged from the temporal evaluation reports, not from the illustrative UI alone.
+## Limitations and Next Steps
+
+- The serving score predicts a rating; it is not yet optimized or evaluated as a ranking objective.
+- The user/item-bias baseline currently outperforms the Random Forest on the temporal rating holdout.
+- The free Render instance can sleep when idle, and the model is retrained after a cold start.
+- Next model milestone: compare ranking metrics (Precision@K, Recall@K, and NDCG@K) and promote a model only when it beats the baseline on a temporal evaluation.
+
+## License and Data
+
+MovieLens 1M is provided by [GroupLens Research](https://grouplens.org/datasets/movielens/1m/). Dataset terms remain those of the provider. The project code is provided for educational and portfolio use.
